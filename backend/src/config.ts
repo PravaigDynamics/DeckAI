@@ -10,11 +10,15 @@ const schema = z.object({
 
   MODEL_PROVIDER: z.string().default("gemini"),
   GEMINI_API_KEY: z.string().optional().default(""),
-  // "gemini-flash-latest" is a Google-maintained alias for their current
-  // recommended flash model, rather than a pinned dated version — avoids
-  // repeating the earlier gemini-2.0-flash deprecation and tends to have
-  // better availability than a freshly released dated model under load.
-  GEMINI_MODEL: z.string().default("gemini-flash-latest"),
+  // "gemini-flash-lite-latest" is a Google-maintained alias (avoids the
+  // gemini-2.0-flash-style pinned-version deprecation) for their current
+  // lite flash model. Measured directly against the live API: the full
+  // "gemini-flash-latest" alias was intermittently 503ing / taking 8s+
+  // under a realistic prompt size, while the lite alias responded in
+  // ~1-2s consistently — better fit for a text-restructuring task where
+  // reliability matters more than the deepest reasoning tier. Swappable
+  // via this env var alone if quality needs outweigh latency later.
+  GEMINI_MODEL: z.string().default("gemini-flash-lite-latest"),
 
   DATA_DIR: z.string().default("./data"),
   BRAND_SOURCE_DIR: z.string().default("./brand-source"),
