@@ -19,6 +19,11 @@ const schema = z.object({
   GENERATED_DIR: z.string().default("./data/generated"),
 
   REVIEWERS: z.string().default("Monika,Ram"),
+
+  // Real Pravaig decks (e.g. the sample induction PPTX) run 40MB+, so the
+  // default headroom is set well above that rather than a generic small
+  // default that would reject legitimate company files.
+  MAX_UPLOAD_MB: z.coerce.number().default(60),
 });
 
 const parsed = schema.parse(process.env);
@@ -44,4 +49,6 @@ export const config = {
   generatedDir: resolvePath(parsed.GENERATED_DIR),
 
   reviewers: parsed.REVIEWERS.split(",").map((s) => s.trim()).filter(Boolean),
+
+  maxUploadMb: parsed.MAX_UPLOAD_MB,
 };

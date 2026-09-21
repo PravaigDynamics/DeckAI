@@ -1,6 +1,7 @@
-import { Router } from "express";
-import multer from "multer";
+import { Router, type NextFunction, type Request, type Response } from "express";
+import multer, { MulterError } from "multer";
 import fs from "fs/promises";
+import { config } from "../config";
 import { detectFormat, extractDocument, generateDocument, outputExtension, outputMimeType } from "../fileProcessing";
 import { getModelProvider } from "../modelProvider";
 import { readBrandReference } from "../brandReference/store";
@@ -8,9 +9,31 @@ import { createJob, generatedFilePath, getJob } from "../storage/jobs";
 
 export const generateRouter = Router();
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.maxUploadMb * 1024 * 1024 },
+});
 
-generateRouter.post("/", upload.single("file"), async (req, res) => {
+/**
+ * multer's own middleware throws before the route handler's try/catch ever
+ * runs, so an oversized file previously fell through to the generic error
+ * handler and showed the user a bare "Unexpected server error." with no
+ * indication of what actually went wrong or how big the file was.
+ */
+function uploadSingleFile(req: Request, res: Response, next: NextFunction) {
+  upload.single("file")(req, res, (err: unknown) => {
+    if (!err) return next();
+    if (err instanceof MulterError && err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({
+        error: `File is too large. The limit is ${config.maxUploadMb} MB.`,
+      });
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(400).json({ error: `Upload failed: ${message}` });
+  });
+}
+
+generateRouter.post("/", uploadSingleFile, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded. Attach a file under the 'file' field." });
