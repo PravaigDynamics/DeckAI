@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+backend/data/
+*.log
+*.tsbuildinfo
+
+# Ad-hoc test output generated while manually trying the app — not source.
+/branded-*.docx
+/branded-*.pptx
+/branded-*.txt
+
+# Brand sample material (PDFs/PPTX) is working data, not source code, and
+# one file alone is 40MB+. Keep it out of git history; brand-source/ is
+# populated locally per README ("Run it locally" step) instead.
+/*.pdf
+/*.pptx
+backend/brand-source/*
+!backend/brand-source/.gitkeep
