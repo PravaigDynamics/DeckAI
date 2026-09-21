@@ -329,48 +329,48 @@ input[type="text"] {
   overflow-y: auto;
 }
 
-.readme-content h2 {
+.markdown-view h2 {
   font-size: 1.15rem;
   margin: 1.4rem 0 0.5rem;
   color: var(--ink);
 }
 
-.readme-content h3 {
+.markdown-view h3 {
   font-size: 1rem;
   margin: 1.1rem 0 0.4rem;
   color: var(--ink);
 }
 
-.readme-content h4 {
+.markdown-view h4 {
   font-size: 0.92rem;
   margin: 1rem 0 0.35rem;
   color: var(--ink);
 }
 
-.readme-content p,
-.readme-content li {
+.markdown-view p,
+.markdown-view li {
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--ink);
 }
 
-.readme-content ul {
+.markdown-view ul {
   padding-left: 1.2rem;
   margin: 0.3rem 0 0.8rem;
 }
 
-.readme-content a {
+.markdown-view a {
   color: var(--accent-dark);
 }
 
-.readme-content code {
+.markdown-view code {
   background: #f2f0ed;
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
   font-size: 0.85em;
 }
 
-.readme-content pre.readme-code {
+.markdown-view pre.markdown-code {
   background: #f6f5f3;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -380,8 +380,15 @@ input[type="text"] {
   margin: 0.5rem 0 1rem;
 }
 
-.readme-content hr {
+.markdown-view hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 1.25rem 0;
+}
+
+.markdown-view .markdown-provenance {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: -0.3rem 0 0.6rem;
 }

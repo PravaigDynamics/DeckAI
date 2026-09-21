@@ -41,11 +41,11 @@ export async function acceptJob(jobId: string, reviewer: string): Promise<void> 
   await parseJsonOrThrow(res);
 }
 
-export async function fetchReadme(): Promise<string> {
-  const res = await fetch(`${API_BASE_URL}/api/docs/readme`);
+export async function fetchBrandReference(): Promise<string> {
+  const res = await fetch(`${API_BASE_URL}/api/brand-reference`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? "Could not load README.");
+    throw new Error(body.error ?? "Could not load the brand reference.");
   }
   return res.text();
 }

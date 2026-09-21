@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Uploader } from "./components/Uploader";
 import { CorrectionForm } from "./components/CorrectionForm";
-import { ReadmeModal } from "./components/ReadmeModal";
+import { BrandReferenceModal } from "./components/BrandReferenceModal";
 import {
   acceptJob,
   downloadUrlFor,
@@ -20,7 +20,7 @@ export default function App() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [reviewStatus, setReviewStatus] = useState<string | null>(null);
   const [reviewBusy, setReviewBusy] = useState(false);
-  const [showReadme, setShowReadme] = useState(false);
+  const [showBrandReference, setShowBrandReference] = useState(false);
 
   async function handleFile(file: File) {
     setReviewStatus(null);
@@ -67,14 +67,14 @@ export default function App() {
             <span className="eyebrow">PRAVAIG</span>
             <h1>Decks Branded AI</h1>
           </div>
-          <button className="ghost" onClick={() => setShowReadme(true)}>
-            View README
+          <button className="ghost" onClick={() => setShowBrandReference(true)}>
+            View Brand Reference
           </button>
         </div>
         <p>Upload a rough deck, doc, or text file to align it with Pravaig brand guidelines.</p>
       </header>
 
-      {showReadme && <ReadmeModal onClose={() => setShowReadme(false)} />}
+      {showBrandReference && <BrandReferenceModal onClose={() => setShowBrandReference(false)} />}
 
       <Uploader onFileSelected={handleFile} disabled={status.kind === "uploading"} />
       {status.kind === "uploading" && (

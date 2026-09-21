@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { fetchReadme } from "../api";
+import { fetchBrandReference } from "../api";
 
 interface Props {
   onClose: () => void;
 }
 
 /**
- * Minimal, dependency-free Markdown rendering — just enough for a README
- * (headings, bullets, fenced code, bold, links). Not a general Markdown
- * engine; swap in a real renderer (e.g. react-markdown) if richer docs
- * content is added later.
+ * Minimal, dependency-free Markdown rendering — just enough for the brand
+ * reference (headings, bullets, fenced code, bold, links, HTML-comment
+ * append markers). Not a general Markdown engine; swap in a real renderer
+ * (e.g. react-markdown) if richer content is added later.
  */
 function renderMarkdown(markdown: string) {
   const lines = markdown.split("\n");
@@ -38,7 +38,7 @@ function renderMarkdown(markdown: string) {
         codeBuffer = [];
       } else {
         elements.push(
-          <pre key={key++} className="readme-code">
+          <pre key={key++} className="markdown-code">
             <code>{codeBuffer.join("\n")}</code>
           </pre>,
         );
@@ -48,6 +48,20 @@ function renderMarkdown(markdown: string) {
     }
     if (codeBuffer !== null) {
       codeBuffer.push(line);
+      continue;
+    }
+
+    // "<!-- appended <timestamp> · source: ... -->" markers left by the
+    // backend's append log — surfaced as a small provenance note rather
+    // than raw HTML comment text.
+    const appendMarker = line.match(/^<!--\s*appended\s+(.*?)\s*-->$/);
+    if (appendMarker) {
+      flushList();
+      elements.push(
+        <p key={key++} className="markdown-provenance">
+          {appendMarker[1]}
+        </p>,
+      );
       continue;
     }
 
@@ -91,12 +105,12 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function ReadmeModal({ onClose }: Props) {
+export function BrandReferenceModal({ onClose }: Props) {
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReadme()
+    fetchBrandReference()
       .then(setMarkdown)
       .catch((err) => setError((err as Error).message));
   }, []);
@@ -105,13 +119,13 @@ export function ReadmeModal({ onClose }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span>README</span>
+          <span>Brand Reference</span>
           <button onClick={onClose}>Close</button>
         </div>
         <div className="modal-body">
           {error && <p className="status-line error">{error}</p>}
           {!error && !markdown && <p className="status-line">Loading…</p>}
-          {markdown && <div className="readme-content">{renderMarkdown(markdown)}</div>}
+          {markdown && <div className="markdown-view">{renderMarkdown(markdown)}</div>}
         </div>
       </div>
     </div>

@@ -5,7 +5,6 @@ import { ensureBrandReferenceExists } from "./brandReference/store";
 import { generateRouter } from "./routes/generate";
 import { reviewRouter } from "./routes/review";
 import { brandReferenceRouter } from "./routes/brandReference";
-import { docsRouter } from "./routes/docs";
 
 async function main() {
   await ensureBrandReferenceExists();
@@ -21,7 +20,6 @@ async function main() {
   app.use("/api/generate", generateRouter);
   app.use("/api/review", reviewRouter);
   app.use("/api/brand-reference", brandReferenceRouter);
-  app.use("/api/docs", docsRouter);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -187,8 +187,10 @@ Built (P0 from the PRD):
 - Reviewer correction loop: a plain-language correction is turned into a
   Markdown rule and appended to the reference, so it's applied automatically
   on the next document.
-- In-app README viewer (`View README` button in the frontend header,
-  served from `GET /api/docs/readme`).
+- In-app brand reference viewer (`View Brand Reference` button in the
+  frontend header) — shows the live `backend/data/brand-reference.md`
+  content, including provenance markers for each appended section, via
+  the existing `GET /api/brand-reference` endpoint.
 
 Stubbed, with the extension point noted in code:
 
