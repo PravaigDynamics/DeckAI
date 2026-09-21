@@ -63,33 +63,40 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-row">
-          <h1>Decks Branded AI</h1>
-          <button onClick={() => setShowReadme(true)}>View README</button>
+          <div>
+            <span className="eyebrow">PRAVAIG</span>
+            <h1>Decks Branded AI</h1>
+          </div>
+          <button className="ghost" onClick={() => setShowReadme(true)}>
+            View README
+          </button>
         </div>
         <p>Upload a rough deck, doc, or text file to align it with Pravaig brand guidelines.</p>
       </header>
 
       {showReadme && <ReadmeModal onClose={() => setShowReadme(false)} />}
 
-      <div className="panel">
-        <Uploader onFileSelected={handleFile} disabled={status.kind === "uploading"} />
-        {status.kind === "uploading" && <p className="status-line">Applying brand reference…</p>}
-        {status.kind === "error" && <p className="status-line error">{status.message}</p>}
-      </div>
+      <Uploader onFileSelected={handleFile} disabled={status.kind === "uploading"} />
+      {status.kind === "uploading" && (
+        <p className="status-line pending">
+          <span className="spinner" aria-hidden="true" />
+          Applying brand reference…
+        </p>
+      )}
+      {status.kind === "error" && <p className="status-line error">{status.message}</p>}
 
       {status.kind === "ready" && (
         <>
-          <div className="panel">
-            <p className="result-title">
-              {status.result.documentTitle ?? "Branded draft ready"}
-            </p>
+          <div className="panel result-panel">
+            <span className="result-badge">Branded draft ready</span>
+            <p className="result-title">{status.result.documentTitle ?? "Untitled document"}</p>
             <a href={downloadUrlFor(status.result.downloadUrl)}>
               <button className="primary">Download branded file</button>
             </a>
 
             {status.result.reviewNotes.length > 0 && (
               <div className="review-notes">
-                Notes from the model:
+                <span className="review-notes-label">Notes from the model</span>
                 <ul>
                   {status.result.reviewNotes.map((note, i) => (
                     <li key={i}>{note}</li>
@@ -100,9 +107,15 @@ export default function App() {
           </div>
 
           <CorrectionForm onAccept={handleAccept} onCorrect={handleCorrect} busy={reviewBusy} />
-          {reviewStatus && <p className="status-line success">{reviewStatus}</p>}
+          {reviewStatus && (
+            <p className={`status-line ${reviewStatus.startsWith("Error") ? "error" : "success"}`}>
+              {reviewStatus}
+            </p>
+          )}
         </>
       )}
+
+      <footer className="app-footer">PRIVATE &amp; CONFIDENTIAL · PRAVAIG {new Date().getFullYear()}</footer>
     </div>
   );
 }

@@ -26,7 +26,10 @@ export function Uploader({ onFileSelected, disabled }: Props) {
         if (file) onFileSelected(file);
       }}
     >
-      <p>Drop a .docx, .pptx, or .txt file here, or click to choose one.</p>
+      <p>
+        Drop a .docx, .pptx, or .txt file here, or{" "}
+        <span className="dropzone-hint">click to choose one</span>.
+      </p>
       <input
         ref={inputRef}
         type="file"
