@@ -96,11 +96,19 @@ generateRouter.get("/:id/download", async (req, res) => {
 
 function friendlyError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
+  const status = (err as { status?: number } | null)?.status;
+
   if (message.includes("GEMINI_API_KEY")) {
     return "Model provider is not configured: set GEMINI_API_KEY in backend/.env.";
   }
   if (message.includes("Unsupported file type")) {
     return message;
+  }
+  if (status === 503 || message.includes("Service Unavailable") || message.includes("overloaded")) {
+    return "The AI model is temporarily overloaded (Gemini reports high demand). This is usually brief — please try again in a moment.";
+  }
+  if (status === 429 || message.includes("Too Many Requests") || message.includes("quota")) {
+    return "The AI model rate limit was hit. Please wait a moment and try again.";
   }
   if (message.includes("could not be parsed as JSON")) {
     return "The model returned an unexpected response. Please try again.";

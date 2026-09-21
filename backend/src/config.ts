@@ -10,7 +10,11 @@ const schema = z.object({
 
   MODEL_PROVIDER: z.string().default("gemini"),
   GEMINI_API_KEY: z.string().optional().default(""),
-  GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
+  // "gemini-flash-latest" is a Google-maintained alias for their current
+  // recommended flash model, rather than a pinned dated version — avoids
+  // repeating the earlier gemini-2.0-flash deprecation and tends to have
+  // better availability than a freshly released dated model under load.
+  GEMINI_MODEL: z.string().default("gemini-flash-latest"),
 
   DATA_DIR: z.string().default("./data"),
   BRAND_SOURCE_DIR: z.string().default("./brand-source"),

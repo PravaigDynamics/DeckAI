@@ -27,6 +27,30 @@ function sanitizeBlockForModel(block: ContentBlock): Record<string, unknown> {
   return sanitized;
 }
 
+/** True for errors worth retrying: Gemini's transient "temporarily
+ *  overloaded" 503s and standard rate-limit 429s. Anything else (bad key,
+ *  bad request, parse failure) is not retried — retrying those just delays
+ *  a failure that won't change. */
+function isRetryableStatus(err: unknown): boolean {
+  const status = (err as { status?: number } | null)?.status;
+  return status === 503 || status === 429;
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableStatus(err) || attempt === attempts - 1) throw err;
+      const delayMs = 800 * 2 ** attempt; // 800ms, 1.6s, 3.2s
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Google Gemini (via Google AI Studio) implementation of ModelProvider.
  * This is the ONLY file that knows about Gemini's SDK/API shape. Everything
@@ -102,7 +126,7 @@ Only include instructions for blocks that actually need a change. Keep
 rewrites faithful to the original meaning; you are rebranding tone/structure,
 not inventing new content.`;
 
-    const result = await this.model({ json: true }).generateContent(prompt);
+    const result = await withRetry(() => this.model({ json: true }).generateContent(prompt));
     const text = result.response.text();
     return safeParsePlan(text);
   }
@@ -129,7 +153,7 @@ heading) that captures this correction so it will be applied automatically
 to future documents of the same kind. Do not repeat the whole reference back.
 Return ONLY the new Markdown fragment to append, no other commentary.`;
 
-    const result = await this.model({ json: false }).generateContent(prompt);
+    const result = await withRetry(() => this.model({ json: false }).generateContent(prompt));
     return result.response.text().trim();
   }
 
@@ -149,7 +173,7 @@ ${rawText.slice(0, 20000)}
 
 Return ONLY the Markdown section, no other commentary.`;
 
-    const result = await this.model({ json: false }).generateContent(prompt);
+    const result = await withRetry(() => this.model({ json: false }).generateContent(prompt));
     return result.response.text().trim();
   }
 }
