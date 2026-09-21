@@ -175,10 +175,11 @@ Built (P0 from the PRD):
   typeface, and confidentiality footer pulled from
   `backend/src/brandReference/brandStyle.ts` (values extracted directly
   from the sample brand PDFs — see that file's comments).
-- DOCX tables and inline images are extracted and carried through to the
-  branded output (tables get header-row shading in the brand accent
+- DOCX and PPTX tables and inline images are extracted and carried through
+  to the branded output (tables get header-row shading in the brand accent
   color); previously these were silently dropped and only headings/
-  paragraphs/bullets survived. See `backend/src/fileProcessing/docx.ts`.
+  paragraphs/bullets/slide text survived. See
+  `backend/src/fileProcessing/docx.ts` and `pptx.ts`.
 - Living Markdown brand reference (`backend/data/brand-reference.md`),
   built from `backend/brand-source/` and appended to — never overwritten —
   as that folder grows (`npm run build:reference`, or `POST
@@ -208,13 +209,14 @@ Stubbed, with the extension point noted in code:
   automatically is a separate piece of infrastructure, not implemented
   here.
 - **PPTX layout fidelity** — PPTX output is rebuilt fresh per slide (title +
-  bullets, with brand-colored backgrounds/accents) rather than preserving
-  the original deck's exact shapes/theme, and — unlike the DOCX path —
-  images and tables inside slides are not yet extracted or carried through.
-  The model's `layout` field (e.g. `chartWidthPercent`, `headingPosition`)
-  is already threaded through `BrandingInstruction` for this to build on;
-  applying it to real shape placement is the next step in
-  `backend/src/fileProcessing/pptx.ts`.
+  bullets + tables/images stacked below, with brand-colored
+  backgrounds/accents) rather than preserving the original deck's exact
+  shape positions and theme. Images and tables ARE now extracted and
+  carried through (fixed alongside the same DOCX gap — see
+  `backend/src/fileProcessing/pptx.ts`), just re-laid-out generically
+  rather than kept at their original coordinates. The model's `layout`
+  field (e.g. `chartWidthPercent`, `headingPosition`) is already threaded
+  through `BrandingInstruction` for exact placement to build on next.
 
 ## Project structure
 

@@ -1,3 +1,4 @@
+import path from "path";
 import JSZip from "jszip";
 import { parseStringPromise } from "xml2js";
 import PptxGenJS from "pptxgenjs";
@@ -5,11 +6,23 @@ import type { BrandingPlan, ContentBlock, ExtractedDocument } from "../modelProv
 import { applyRewrites } from "./applyCommon";
 import { brandStyle } from "../brandReference/brandStyle";
 
+const IMAGE_EXT_TO_MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  bmp: "image/bmp",
+};
+
 /**
- * PPTX read support: extracts slide text as structural blocks (title/body)
- * by reading each slideN.xml directly from the pptx zip. This is a
- * text-first pass — full shape/position preservation is a documented
- * extension point (see generatePptx below).
+ * PPTX read support: extracts slide text, images, and tables as structural
+ * blocks by reading each slideN.xml (and its .rels file, for image
+ * relationships) directly from the pptx zip. Images/tables were previously
+ * invisible to extraction entirely — a slide with a product photo or a
+ * specs table lost that content on the way to the branded deck, same class
+ * of bug as the DOCX path had. Full shape/position preservation (exact
+ * original layout) is still a documented extension point — see
+ * generatePptx below.
  */
 export async function extractPptx(buffer: Buffer): Promise<ExtractedDocument> {
   const zip = await JSZip.loadAsync(buffer);
@@ -19,6 +32,7 @@ export async function extractPptx(buffer: Buffer): Promise<ExtractedDocument> {
 
   const blocks: ContentBlock[] = [];
   let blockId = 0;
+  const nextId = () => `b${blockId++}`;
 
   for (const file of slideFiles) {
     const slideIndex = slideNumber(file);
@@ -28,12 +42,34 @@ export async function extractPptx(buffer: Buffer): Promise<ExtractedDocument> {
     const texts = collectSlideTexts(parsed);
     texts.forEach((text, idx) => {
       blocks.push({
-        id: `b${blockId++}`,
+        id: nextId(),
         kind: idx === 0 ? "slide_title" : "slide_body",
         text,
         slideIndex,
       });
     });
+
+    const relsPath = `ppt/slides/_rels/${path.basename(file)}.rels`;
+    const relTargets = await readRelationships(zip, relsPath);
+
+    const tables = collectSlideTables(parsed);
+    for (const rows of tables) {
+      if (rows.length) blocks.push({ id: nextId(), kind: "table", text: "", tableRows: rows, slideIndex });
+    }
+
+    const imageRelIds = collectSlideImageRelIds(parsed);
+    for (const relId of imageRelIds) {
+      const target = relTargets.get(relId);
+      if (!target) continue;
+      const mediaPath = resolveMediaPath(target);
+      const mediaFile = zip.file(mediaPath);
+      if (!mediaFile) continue;
+      const ext = mediaPath.split(".").pop()?.toLowerCase() ?? "";
+      const mimeType = IMAGE_EXT_TO_MIME[ext];
+      if (!mimeType) continue; // unsupported image type (e.g. embedded svg/emf), skipped rather than failing the whole slide
+      const base64 = await mediaFile.async("base64");
+      blocks.push({ id: nextId(), kind: "image", text: "", image: { mimeType, base64 }, slideIndex });
+    }
   }
 
   return { sourceFormat: "pptx", blocks };
@@ -54,6 +90,56 @@ function collectSlideTexts(parsedXml: any): string[] {
     if (shapeText) texts.push(shapeText);
   }
   return texts;
+}
+
+/** Collects <a:tbl> elements as row-major text grids. */
+function collectSlideTables(parsedXml: any): string[][][] {
+  const tableEls = deepFind(parsedXml, "a:tbl") ?? [];
+  return tableEls.map((tbl) => {
+    const rowEls = deepFind(tbl, "a:tr") ?? [];
+    return rowEls.map((row) => {
+      const cellEls = deepFind(row, "a:tc") ?? [];
+      return cellEls.map((cell) => {
+        const runs = deepFind(cell, "a:t") ?? [];
+        return runs.map((r: any) => (typeof r === "string" ? r : r._ ?? "")).join(" ").trim();
+      });
+    });
+  });
+}
+
+/** Collects relationship ids (rId strings) referenced by <p:pic><a:blip r:embed="rIdN"/>. */
+function collectSlideImageRelIds(parsedXml: any): string[] {
+  const pics = deepFind(parsedXml, "p:pic") ?? [];
+  const ids: string[] = [];
+  for (const pic of pics) {
+    const blips = deepFind(pic, "a:blip") ?? [];
+    for (const blip of blips) {
+      const relId = blip?.$?.["r:embed"];
+      if (relId) ids.push(relId);
+    }
+  }
+  return ids;
+}
+
+/** Reads a .rels XML part into a Map of relationship id -> target path. */
+async function readRelationships(zip: JSZip, relsPath: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const file = zip.file(relsPath);
+  if (!file) return map;
+  const xml = await file.async("string");
+  const parsed = await parseStringPromise(xml);
+  const relationships = parsed?.Relationships?.Relationship ?? [];
+  for (const rel of relationships) {
+    const id = rel?.$?.Id;
+    const target = rel?.$?.Target;
+    if (id && target) map.set(id, target);
+  }
+  return map;
+}
+
+/** Relationship targets are relative to ppt/slides/, e.g. "../media/image1.png". */
+function resolveMediaPath(target: string): string {
+  return path.posix.normalize(path.posix.join("ppt/slides", target));
 }
 
 /** Recursively collects all arrays under a given key name, anywhere in the xml2js object tree. */
@@ -79,13 +165,14 @@ function deepFind(node: any, key: string): any[] | undefined {
 
 /**
  * PPTX write support: rebuilds a fresh, brand-aligned deck from the final
- * blocks using pptxgenjs (one slide per slideIndex group; first block on a
- * slide becomes the title, rest become body bullets). This intentionally
- * does NOT try to preserve the original deck's exact shape positions/theme —
- * that is the natural next extension (map layout_intent instructions from
- * the model, e.g. chartWidthPercent/headingPosition, onto pptxgenjs shape
- * coordinates) and is stubbed via the `layout` field already threaded
- * through BrandingInstruction.
+ * blocks using pptxgenjs (one slide per slideIndex group; first text block
+ * on a slide becomes the title, rest become body bullets; tables/images are
+ * placed below the text). This intentionally does NOT try to preserve the
+ * original deck's exact shape positions/theme — that is the natural next
+ * extension (map layout_intent instructions from the model, e.g.
+ * chartWidthPercent/headingPosition, onto pptxgenjs shape coordinates) and
+ * is stubbed via the `layout` field already threaded through
+ * BrandingInstruction.
  */
 export async function generatePptx(doc: ExtractedDocument, plan: BrandingPlan): Promise<Buffer> {
   const finalBlocks = applyRewrites(doc.blocks, plan);
@@ -104,7 +191,10 @@ export async function generatePptx(doc: ExtractedDocument, plan: BrandingPlan): 
   slideIndexes.forEach((idx, position) => {
     const slide = pptx.addSlide();
     const blocksForSlide = bySlide.get(idx) ?? [];
-    const [titleBlock, ...bodyBlocks] = blocksForSlide;
+    const textBlocks = blocksForSlide.filter((b) => !b.tableRows && !b.image);
+    const tableBlocks = blocksForSlide.filter((b) => b.tableRows?.length);
+    const imageBlocks = blocksForSlide.filter((b) => b.image);
+    const [titleBlock, ...bodyBlocks] = textBlocks;
     const isTitleSlide = position === 0;
 
     // Cover slide gets the brand's signature orange field (per the sample
@@ -137,7 +227,13 @@ export async function generatePptx(doc: ExtractedDocument, plan: BrandingPlan): 
       });
     }
 
+    // Body text takes the top band; tables/images stack below it so neither
+    // overlaps. With both present the slide gets tall — acceptable for a
+    // text-first rebuild, and a place layout_intent hints would refine next.
+    let cursorY = isTitleSlide ? 3.9 : 1.4;
+
     if (bodyBlocks.length) {
+      const bodyHeight = Math.min(2.6, 0.35 * bodyBlocks.length + 0.3);
       slide.addText(
         bodyBlocks.map((b) => ({
           text: b.text,
@@ -145,14 +241,49 @@ export async function generatePptx(doc: ExtractedDocument, plan: BrandingPlan): 
         })),
         {
           x: 0.5,
-          y: isTitleSlide ? 3.9 : 1.4,
+          y: cursorY,
           w: 9,
-          h: 5,
+          h: bodyHeight,
           fontSize: 16,
           fontFace: brandStyle.fonts.primary,
           color: bodyTextColor,
         },
       );
+      cursorY += bodyHeight + 0.2;
+    }
+
+    for (const tableBlock of tableBlocks) {
+      const rows = tableBlock.tableRows!;
+      const tableHeight = Math.min(2.5, 0.35 * rows.length);
+      slide.addTable(
+        rows.map((row, rowIndex) =>
+          row.map((cellText) => ({
+            text: cellText,
+            options: {
+              fontFace: brandStyle.fonts.primary,
+              fontSize: 12,
+              bold: rowIndex === 0,
+              color: rowIndex === 0 ? brandStyle.colors.white : brandStyle.colors.dark,
+              fill: rowIndex === 0 ? { color: brandStyle.colors.accent } : undefined,
+            },
+          })),
+        ),
+        { x: 0.5, y: cursorY, w: 9, h: tableHeight, border: { type: "solid", color: brandStyle.colors.muted, pt: 0.5 } },
+      );
+      cursorY += tableHeight + 0.25;
+    }
+
+    for (const imageBlock of imageBlocks) {
+      const { mimeType, base64 } = imageBlock.image!;
+      const imgHeight = 2.2;
+      slide.addImage({
+        data: `data:${mimeType};base64,${base64}`,
+        x: 0.5,
+        y: cursorY,
+        w: 3.2,
+        h: imgHeight,
+      });
+      cursorY += imgHeight + 0.25;
     }
 
     slide.addText(brandStyle.footerText(), {
