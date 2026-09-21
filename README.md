@@ -171,6 +171,14 @@ Built (P0 from the PRD):
 
 - Upload DOCX/PPTX/text, apply the brand reference via the model, return
   the same format, download it.
+- Real visual branding on output, not just reworded text: accent color,
+  typeface, and confidentiality footer pulled from
+  `backend/src/brandReference/brandStyle.ts` (values extracted directly
+  from the sample brand PDFs — see that file's comments).
+- DOCX tables and inline images are extracted and carried through to the
+  branded output (tables get header-row shading in the brand accent
+  color); previously these were silently dropped and only headings/
+  paragraphs/bullets survived. See `backend/src/fileProcessing/docx.ts`.
 - Living Markdown brand reference (`backend/data/brand-reference.md`),
   built from `backend/brand-source/` and appended to — never overwritten —
   as that folder grows (`npm run build:reference`, or `POST
@@ -178,6 +186,8 @@ Built (P0 from the PRD):
 - Reviewer correction loop: a plain-language correction is turned into a
   Markdown rule and appended to the reference, so it's applied automatically
   on the next document.
+- In-app README viewer (`View README` button in the frontend header,
+  served from `GET /api/docs/readme`).
 
 Stubbed, with the extension point noted in code:
 
@@ -198,7 +208,9 @@ Stubbed, with the extension point noted in code:
   automatically is a separate piece of infrastructure, not implemented
   here.
 - **PPTX layout fidelity** — PPTX output is rebuilt fresh per slide (title +
-  bullets) rather than preserving the original deck's exact shapes/theme.
+  bullets, with brand-colored backgrounds/accents) rather than preserving
+  the original deck's exact shapes/theme, and — unlike the DOCX path —
+  images and tables inside slides are not yet extracted or carried through.
   The model's `layout` field (e.g. `chartWidthPercent`, `headingPosition`)
   is already threaded through `BrandingInstruction` for this to build on;
   applying it to real shape placement is the next step in

@@ -1,9 +1,31 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type {
   BrandingPlan,
+  ContentBlock,
   ExtractedDocument,
   ModelProvider,
 } from "./types";
+
+/**
+ * Strips heavy/non-textual payloads before a block is sent to the model.
+ * Image base64 would blow up prompt size/cost for no benefit (the model
+ * never edits images); large tables are summarized to a short preview so
+ * the model still knows the table exists and roughly what it contains,
+ * without being tempted to rewrite cell-by-cell data it can't see in full.
+ */
+function sanitizeBlockForModel(block: ContentBlock): Record<string, unknown> {
+  const { id, kind, level, text, slideIndex, tableRows } = block;
+  const sanitized: Record<string, unknown> = { id, kind, level, text, slideIndex };
+  if (tableRows) {
+    sanitized.text = undefined;
+    sanitized.tablePreview = tableRows.slice(0, 3).map((row) => row.join(" | "));
+    sanitized.rowCount = tableRows.length;
+  }
+  if (kind === "image") {
+    sanitized.text = undefined;
+  }
+  return sanitized;
+}
 
 /**
  * Google Gemini (via Google AI Studio) implementation of ModelProvider.
@@ -50,7 +72,14 @@ ${brandReferenceMarkdown || "(empty — no brand reference yet, use general prof
 """
 
 SOURCE DOCUMENT (format: ${doc.sourceFormat}), extracted as structural blocks:
-${JSON.stringify(doc.blocks, null, 2)}
+${JSON.stringify(doc.blocks.map(sanitizeBlockForModel), null, 2)}
+
+Blocks of kind "image" carry no text — they are passed through to the output
+unchanged and are listed here only so you know they exist between the
+surrounding blocks; do not emit rewrite_text/change_kind instructions for
+them. Blocks of kind "table" show a text preview of their cells; only use
+rewrite_text on them if you are correcting a caption-like block, never to
+rewrite individual cell data.
 
 Return ONLY a JSON object matching this shape, no prose outside the JSON:
 {

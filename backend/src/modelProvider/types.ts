@@ -12,13 +12,19 @@
 /** A single structural block extracted from the source file, independent of format. */
 export interface ContentBlock {
   id: string;
-  /** heading | paragraph | bullet_list | slide_title | slide_body | table | image_placeholder */
+  /** heading | paragraph | bullet_list | slide_title | slide_body | table | image */
   kind: string;
   /** Nesting/level hint, e.g. heading level or bullet indent depth. */
   level?: number;
   text: string;
   /** For slide-based formats: which slide this block belongs to. */
   slideIndex?: number;
+  /** Present when kind === "table": row-major cell text, first row treated as a header. */
+  tableRows?: string[][];
+  /** Present when kind === "image": the source image, carried through untouched.
+   *  Never sent to the model (see geminiProvider's block sanitizing) — the model
+   *  reasons about text/structure only; images are structural passthrough. */
+  image?: { mimeType: string; base64: string };
 }
 
 export interface ExtractedDocument {
